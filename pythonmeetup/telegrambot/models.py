@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -7,15 +8,6 @@ class User(models.Model):
 
     def __str__(self):
         return self.nickname
-
-
-class Question(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='question')
-    text = models.CharField(max_length=500, verbose_name='Вопрос')
-    answered = models.BooleanField(default=False, verbose_name='Отвечен?')
-
-    def __str__(self):
-        return f'{self.user} Q: {self.id}'
 
 
 class Event(models.Model):
@@ -39,3 +31,27 @@ class Lecture(models.Model):
 
     def __str__(self):
         return f'{self.speaker} {self.date} {self.start_time} - {self.end_time}'
+
+    @classmethod
+    def validate_time(cls, lecture):
+        existing_lectures = cls.objects.filter(date=lecture.date)
+
+        for existing_lecture in existing_lectures:
+            if existing_lecture.pk == lecture.pk:
+                continue
+
+            if lecture.start_time < existing_lecture.end_time and lecture.end_time > existing_lecture.start_time:
+                raise ValidationError('Время доклада пересекается с другим докладом.')
+
+    def clean(self):
+        self.validate_time(self)
+
+
+class Question(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='questions')
+    lecture = models.ForeignKey(Lecture, on_delete=models.CASCADE, related_name='questions')
+    text = models.CharField(max_length=500, verbose_name='Вопрос')
+    answered = models.BooleanField(default=False, verbose_name='Отвечен?')
+
+    def __str__(self):
+        return f'{self.user} Q: {self.id}'
