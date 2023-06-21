@@ -30,7 +30,7 @@ class Lecture(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='lectures', verbose_name='Мероприятие')
 
     def __str__(self):
-        return f'{self.speaker} {self.date} {self.start_time} - {self.end_time}'
+        return f'{self.speaker} {self.speaker} {self.date} {self.start_time} - {self.end_time}'
 
     @classmethod
     def validate_time(cls, lecture):

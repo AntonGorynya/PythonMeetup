@@ -10,7 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+from environs import Env
 from pathlib import Path
+
+env = Env()
+env.read_env()
+TG_SPEAKER_TOKEN = env('TG_TOKEN')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
