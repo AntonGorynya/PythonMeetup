@@ -6,7 +6,6 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pythonmeetup.settings')
 django.setup()
 
-from django.core.wsgi import get_wsgi_application
 from django.utils import timezone
 from faker import Faker
 from telegrambot.models import Event, Lecture, Question, Listener
@@ -80,7 +79,6 @@ def create_questions():
 
 
 def main():
-    get_wsgi_application()
 
     try:
         create_listeners()
