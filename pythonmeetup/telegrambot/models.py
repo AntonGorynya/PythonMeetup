@@ -2,12 +2,12 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 
-class User(models.Model):
+class Listener(models.Model):
     nickname = models.CharField(max_length=500, verbose_name='Никнейм клиента', unique=True)
     isspeaker = models.BooleanField(default=False, verbose_name='Является спикером?')
 
     def __str__(self):
-        return self.nickname
+        return f'{self.nickname} {self.isspeaker}'
 
 
 class Event(models.Model):
@@ -25,7 +25,7 @@ class Lecture(models.Model):
     date = models.DateField(verbose_name='Дата доклада')
     start_time = models.TimeField(verbose_name='Начало доклада')
     end_time = models.TimeField(verbose_name='Окончание доклада')
-    speaker = models.ForeignKey(User, on_delete=models.CASCADE, related_name='lectures', verbose_name='Спикер')
+    speaker = models.ForeignKey(Listener, on_delete=models.CASCADE, related_name='lectures', verbose_name='Спикер')
     isfinished = models.BooleanField(default=False, verbose_name='Доклад завершен?')
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='lectures', verbose_name='Мероприятие')
 
@@ -48,10 +48,10 @@ class Lecture(models.Model):
 
 
 class Question(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='questions')
+    listener = models.ForeignKey(Listener, on_delete=models.CASCADE, related_name='questions')
     lecture = models.ForeignKey(Lecture, on_delete=models.CASCADE, related_name='questions')
     text = models.CharField(max_length=500, verbose_name='Вопрос')
     answered = models.BooleanField(default=False, verbose_name='Отвечен?')
 
     def __str__(self):
-        return f'{self.user} Q: {self.id}'
+        return f'{self.listener} Q: {self.id}'
