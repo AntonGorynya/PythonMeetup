@@ -11,7 +11,6 @@ from django.utils import timezone
 from faker import Faker
 from telegrambot.models import Event, Lecture, Question, Listener
 
-fake = Faker()
 
 def create_listeners():
     for _ in range(10):
@@ -81,8 +80,6 @@ def create_questions():
 
 
 def main():
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pythonmeetup.settings')
-    django.setup()
     get_wsgi_application()
 
     try:
@@ -96,4 +93,5 @@ def main():
 
 
 if __name__ == '__main__':
+    fake = Faker()
     main()
