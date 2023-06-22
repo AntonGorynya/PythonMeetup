@@ -47,7 +47,7 @@ class Command(BaseCommand):
             ]
             if lecture:
                 message_text = f'Добрый день {username}. По вашей лекции есть {questions.count()}' \
-                               f' не отвеченных вопрос(a/ов)'
+                               f' {decline_question(questions.count())}'
                 keyboard = [
                     [
                         InlineKeyboardButton("Перейти к вопросам", callback_data='to_questions'),
@@ -204,3 +204,12 @@ def get_questions(lecture):
         answered=False,
     )
     return questions
+
+
+def decline_question(n):
+    if n % 100 == 1:
+        return 'не отвеченный вопрос'
+    elif n % 10 in [2, 3, 4] and n % 100 not in [12, 13, 14]:
+        return 'не отвеченных вопроса'
+    else:
+        return 'не отвеченных вопросов'
