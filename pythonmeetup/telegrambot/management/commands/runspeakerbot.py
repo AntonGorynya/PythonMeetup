@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from pythonmeetup import settings
-from ...models import User, Question, Lecture, Event
+from ...models import Listener, Question, Lecture, Event
 import datetime
 from telegram import (
     InlineKeyboardButton,
@@ -18,6 +18,8 @@ from telegram.ext import (
     ConversationHandler,
 )
 
+DEBUG = True
+
 class Command(BaseCommand):
     help = 'Телеграм-бот для спикеров'
     def handle(self, *args, **kwargs):
@@ -27,101 +29,119 @@ class Command(BaseCommand):
 
         def start_conversation(update, context):
             query = update.callback_query
+            if update.message:
+                username = update.message.from_user.username
+            else:
+                username = query.message.chat['username']
+            lecture = get_lecture(username)
+            questions = get_questions(lecture)
+            message_text = f'Добрый день {username}. Сегодня у вас нет активных лекций'
             keyboard = [
-               [
-                   InlineKeyboardButton("Перейти к вопросам", callback_data='to_questions'),
-               ],
-               [
-                   InlineKeyboardButton("Завершить лекцию", callback_data='to_end_lecture'),
-               ],
+                [
+                    InlineKeyboardButton("Обновить", callback_data='to_start'),
+                ],
             ]
+            if lecture:
+                message_text = f'Добрый день {username}. По вашей лекции есть {questions.count()} не отвеченных вопрос(a/ов)'
+                keyboard = [
+                    [
+                        InlineKeyboardButton("Перейти к вопросам", callback_data='to_questions'),
+                    ],
+                    [
+                        InlineKeyboardButton("Завершить лекцию", callback_data='to_end_lecture'),
+                    ],
+                    [
+                        InlineKeyboardButton("Обновить", callback_data='to_start'),
+                    ],
+                ]
+            context.user_data['questions'] = questions
+            context.user_data['lecture'] = lecture
+
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             if update.message:
-                username = update.message.from_user.username
-                lecture = get_lecture(username)
-                questions = get_questions(lecture)
-                context.user_data['questions'] = questions
-                context.user_data['lecture'] = lecture
                 update.message.reply_text(
-                    text=f"Добрый день {username}. По вашей лекции есть {len(questions)} не отвеченных вопрос(a/ов)",
+                    text= message_text,
                     reply_markup=reply_markup,
                     parse_mode=ParseMode.HTML
                 )
             else:
-                username = query.message.chat['username']
                 query.edit_message_text(
-                    text=f"Добрый день {username}. По вашей лекции есть N вопросов", reply_markup=reply_markup,
+                    text=message_text, reply_markup=reply_markup,
                     parse_mode=ParseMode.HTML
                 )
-            return 'GREETINGS'
+
+            return 'SPEAKER'
         def show_question(update, context):
             query = update.callback_query
-            questions = context.user_data['questions']
+            lecture = context.user_data['lecture']
+            questions = get_questions(lecture)
             if 'question_num' not in context.user_data:
                 context.user_data['question_num'] = 0
-            question = questions[0]
-            quantity = len(questions)
             question_num = context.user_data['question_num']
+            quantity = questions.count()
 
-            keyboard = [
-                [
-                    InlineKeyboardButton("<<", callback_data=-1),
-                    InlineKeyboardButton(">>", callback_data=1),
-                ],
-                [
-                    InlineKeyboardButton("Пометить как отмеченный", callback_data='mark'),
-                ],
-                [
-                    InlineKeyboardButton("Завершить лекцию", callback_data='to_end_lecture'),
-                ],
-            ]
+            print(quantity)
 
+            # Получаем порядковый номер следующего вопроса
             if '1' in query['data']:
-                question_num = (context.user_data['question_num'] + int(query['data'])) % quantity
+                question_num = (question_num + int(query['data'])) % quantity
                 context.user_data['question_num'] = question_num
-                question = context.user_data['questions'][question_num]
+                question = questions[question_num]
 
             if query['data'] == 'mark':
+                question = questions[question_num]
+                question.answered = True
+                question.save()
                 quantity -= 1
-                if quantity > 0:
-                    questions = list(questions)
-                    pop_question = questions.pop(question_num)
-                    pop_question.answered = True
-                    print(pop_question.id)
-                    context.user_data['questions'] = questions
-                    question = questions[question_num % quantity]
-            if quantity == 1:
+                print(quantity)
+                if quantity:
+                    context.user_data['question_num'] = question_num % (quantity)
+                    question = questions[context.user_data['question_num']]
+                else:
+                    context.user_data['question_num'] = 0
+
+            if quantity:
+                question = questions[question_num]
                 keyboard = [
                     [
                         InlineKeyboardButton("Пометить как отмеченный", callback_data='mark'),
                     ],
                     [
                         InlineKeyboardButton("Завершить лекцию", callback_data='to_end_lecture'),
-                    ]
+                    ],
                 ]
+
+            if quantity > 1:
+                keyboard.append([
+                        InlineKeyboardButton("<<", callback_data=-1),
+                        InlineKeyboardButton(">>", callback_data=1),
+                    ])
             if quantity == 0:
                 keyboard = [
+                    [
+                        InlineKeyboardButton("Обновить", callback_data='to_start'),
+                    ],
                     [
                         InlineKeyboardButton("Завершить лекцию", callback_data='to_end_lecture'),
                     ]
                 ]
-
 
             reply_markup = InlineKeyboardMarkup(keyboard)
 
 
             if quantity:
                 query.edit_message_text(
-                   text=f"{question.user}:\n {question.text}", reply_markup=reply_markup,
-                   parse_mode=ParseMode.HTML
+                    text=f"Вопрос от пользователя {question.listener.nickname}:\n {question.text}",
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
                 )
             else:
                 query.edit_message_text(
-                    text=f"Вы ответили на все попроы", reply_markup=reply_markup,
+                    text=f"Вы ответили на все вопросы", reply_markup=reply_markup,
                     parse_mode=ParseMode.HTML
                 )
-            return 'GREETINGS'
+            return 'SPEAKER'
 
         def cancel(update, _):
            update.message.reply_text(
@@ -130,9 +150,9 @@ class Command(BaseCommand):
            )
            return ConversationHandler.END
 
-        def end_conversation(update, _):
+        def end_conversation(update, context):
             query = update.callback_query
-
+            lecture = context.user_data['lecture']
             keyboard = [
                 [
                     InlineKeyboardButton("На главную", callback_data='to_start'),
@@ -140,16 +160,19 @@ class Command(BaseCommand):
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
+            lecture.isfinished = True
+            lecture.save()
+
             query.edit_message_text(
                 text=f"Лекция завершена", reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
             )
-            return 'GREETINGS'
+            return 'SPEAKER'
 
         conv_handler = ConversationHandler(
            entry_points=[CommandHandler('start', start_conversation)],
            states={
-               'GREETINGS': [
+               'SPEAKER': [
                    CallbackQueryHandler(end_conversation, pattern='to_end_lecture'),
                    CallbackQueryHandler(show_question, pattern='to_questions|mark|1|-1'),
                    CallbackQueryHandler(start_conversation, pattern='to_start'),
@@ -174,6 +197,7 @@ def get_lecture(username):
 
 def get_questions(lecture):
     questions = Question.objects.filter(
-        lecture=lecture
+        lecture=lecture,
+        answered=False,
     )
-    return list(questions)
+    return questions
