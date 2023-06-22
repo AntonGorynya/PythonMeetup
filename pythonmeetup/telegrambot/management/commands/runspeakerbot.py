@@ -20,8 +20,10 @@ from telegram.ext import (
 
 DEBUG = True
 
+
 class Command(BaseCommand):
     help = 'Телеграм-бот для спикеров'
+
     def handle(self, *args, **kwargs):
         tg_token = settings.TG_SPEAKER_TOKEN
         updater = Updater(token=tg_token, use_context=True)
@@ -29,10 +31,12 @@ class Command(BaseCommand):
 
         def start_conversation(update, context):
             query = update.callback_query
+            previous_text = ''
             if update.message:
                 username = update.message.from_user.username
             else:
                 username = query.message.chat['username']
+                previous_text = query.message.text
             lecture = get_lecture(username)
             questions = get_questions(lecture)
             message_text = f'Добрый день {username}. Сегодня у вас нет активных лекций'
@@ -42,7 +46,8 @@ class Command(BaseCommand):
                 ],
             ]
             if lecture:
-                message_text = f'Добрый день {username}. По вашей лекции есть {questions.count()} не отвеченных вопрос(a/ов)'
+                message_text = f'Добрый день {username}. По вашей лекции есть {questions.count()}' \
+                               f' не отвеченных вопрос(a/ов)'
                 keyboard = [
                     [
                         InlineKeyboardButton("Перейти к вопросам", callback_data='to_questions'),
@@ -58,20 +63,20 @@ class Command(BaseCommand):
             context.user_data['lecture'] = lecture
 
             reply_markup = InlineKeyboardMarkup(keyboard)
-
-            if update.message:
-                update.message.reply_text(
-                    text= message_text,
-                    reply_markup=reply_markup,
-                    parse_mode=ParseMode.HTML
-                )
-            else:
-                query.edit_message_text(
-                    text=message_text, reply_markup=reply_markup,
-                    parse_mode=ParseMode.HTML
-                )
-
+            if message_text != previous_text:
+                if update.message:
+                    update.message.reply_text(
+                        text=message_text,
+                        reply_markup=reply_markup,
+                        parse_mode=ParseMode.HTML
+                    )
+                else:
+                    query.edit_message_text(
+                        text=message_text, reply_markup=reply_markup,
+                        parse_mode=ParseMode.HTML
+                    )
             return 'SPEAKER'
+
         def show_question(update, context):
             query = update.callback_query
             lecture = context.user_data['lecture']
@@ -80,8 +85,6 @@ class Command(BaseCommand):
                 context.user_data['question_num'] = 0
             question_num = context.user_data['question_num']
             quantity = questions.count()
-
-            print(quantity)
 
             # Получаем порядковый номер следующего вопроса
             if '1' in query['data']:
@@ -94,9 +97,8 @@ class Command(BaseCommand):
                 question.answered = True
                 question.save()
                 quantity -= 1
-                print(quantity)
                 if quantity:
-                    context.user_data['question_num'] = question_num % (quantity)
+                    context.user_data['question_num'] = question_num % quantity
                     question = questions[context.user_data['question_num']]
                 else:
                     context.user_data['question_num'] = 0
@@ -129,7 +131,6 @@ class Command(BaseCommand):
 
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-
             if quantity:
                 query.edit_message_text(
                     text=f"Вопрос от пользователя {question.listener.nickname}:\n {question.text}",
@@ -144,11 +145,11 @@ class Command(BaseCommand):
             return 'SPEAKER'
 
         def cancel(update, _):
-           update.message.reply_text(
+            update.message.reply_text(
                'До новых встреч',
                reply_markup=ReplyKeyboardRemove()
-           )
-           return ConversationHandler.END
+            )
+            return ConversationHandler.END
 
         def end_conversation(update, context):
             query = update.callback_query
@@ -186,6 +187,7 @@ class Command(BaseCommand):
         updater.start_polling()
         updater.idle()
 
+
 def get_lecture(username):
     lecture = Lecture.objects.filter(
         date=datetime.date.today(),
@@ -194,6 +196,7 @@ def get_lecture(username):
         speaker__nickname=username
     ).first()
     return lecture
+
 
 def get_questions(lecture):
     questions = Question.objects.filter(
