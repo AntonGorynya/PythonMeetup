@@ -25,6 +25,7 @@ python3 manage.py createsuperuser
 Перед установкой создайте файл **.env** вида:
 ```properties
 TG_SPEAKER_TOKEN=YOUR_TG_TOKEN
+TG_LISTENER_TOKEN=YOUR_TG_TOKEN
 PAYMENTS_TOKEN=PAYMENTS_TOKEN
 ```
 - Токен для Телеграм бота вы можете получить https://telegram.me/BotFather Чат ID можно узнать в свойствах канала
@@ -32,9 +33,13 @@ PAYMENTS_TOKEN=PAYMENTS_TOKEN
 - Подключите оплату в настройках бота через BotFather
 
 ### Как запустить
-Для запуска бота используйте команду
+Для запуска бота спикера используйте команду
 ```sh
 python manage.py runspeakerbot
+```
+Для запуска бота слушателя используйте команду
+```sh
+python manage.py run_meetup_bot
 ```
 
 Для запуска админки используйте команду
