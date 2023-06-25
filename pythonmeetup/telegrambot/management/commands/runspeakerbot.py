@@ -18,8 +18,6 @@ from telegram.ext import (
     ConversationHandler,
 )
 
-DEBUG = True
-
 
 class Command(BaseCommand):
     help = 'Телеграм-бот для спикеров'
