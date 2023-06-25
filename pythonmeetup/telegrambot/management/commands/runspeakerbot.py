@@ -27,7 +27,7 @@ class Command(BaseCommand):
         updater = Updater(token=tg_token, use_context=True)
         dispatcher = updater.dispatcher
 
-        def start_conversation(update, context):
+        def start_speaker_conversation(update, context):
             query = update.callback_query
             previous_text = ''
             if update.message:
@@ -69,14 +69,13 @@ class Command(BaseCommand):
                         parse_mode=ParseMode.HTML
                     )
                 else:
-                    query.edit_message_text(
-                        text=message_text, reply_markup=reply_markup,
-                        parse_mode=ParseMode.HTML
-                    )
+                    edit_message_if_new(query, message_text, previous_text, reply_markup)
+
             return 'SPEAKER'
 
         def show_question(update, context):
             query = update.callback_query
+            previous_text = query.message.text
             lecture = context.user_data['lecture']
             questions = get_questions(lecture)
             if 'question_num' not in context.user_data:
@@ -130,16 +129,11 @@ class Command(BaseCommand):
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             if quantity:
-                query.edit_message_text(
-                    text=f"Вопрос от пользователя @{question.listener.nickname}:\n {question.text}",
-                    reply_markup=reply_markup,
-                    parse_mode=ParseMode.HTML
-                )
+                message_text = f"Вопрос от пользователя @{question.listener.nickname}:\n {question.text}"
             else:
-                query.edit_message_text(
-                    text=f"Вы ответили на все вопросы", reply_markup=reply_markup,
-                    parse_mode=ParseMode.HTML
-                )
+                message_text = f"Вы ответили на все вопросы"
+
+            edit_message_if_new(query, message_text, previous_text, reply_markup)
             return 'SPEAKER'
 
         def cancel(update, _):
@@ -169,19 +163,19 @@ class Command(BaseCommand):
             return 'SPEAKER'
 
         conv_handler = ConversationHandler(
-           entry_points=[CommandHandler('start', start_conversation)],
+           entry_points=[CommandHandler('start', start_speaker_conversation)],
            states={
                'SPEAKER': [
                    CallbackQueryHandler(end_conversation, pattern='to_end_lecture'),
                    CallbackQueryHandler(show_question, pattern='to_questions|mark|1|-1'),
-                   CallbackQueryHandler(start_conversation, pattern='to_start'),
+                   CallbackQueryHandler(start_speaker_conversation, pattern='to_start'),
                ],
            },
            fallbacks=[CommandHandler('cancel', cancel)]
         )
 
         dispatcher.add_handler(conv_handler)
-        dispatcher.add_handler(CommandHandler('start', start_conversation))
+        dispatcher.add_handler(CommandHandler('start', start_speaker_conversation))
         updater.start_polling()
         updater.idle()
 
@@ -211,3 +205,12 @@ def decline_question(n):
         return 'не отвеченных вопроса'
     else:
         return 'не отвеченных вопросов'
+
+
+def edit_message_if_new(query, message_text, previous_text, reply_markup):
+    if message_text != previous_text:
+        query.edit_message_text(
+            text=message_text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML
+        )
