@@ -114,17 +114,6 @@ class Command(BaseCommand):
         def echo(update: Update, context: CallbackContext) -> None:
             context.bot.delete_message(chat_id=update.effective_chat.id,
                                        message_id=update.message.message_id)
-
-            try:
-                context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
-                                              text=f'***\n{context.user_data["user"]}, Ваш сообщение УДАЛЕНО!\n'
-                                                   f'Если Вы хотите задать вопрос перейдите в разде:\n'
-                                                   f'"Задать вопрос по текущему докладу"\n\n****')
-
-            except BadRequest:
-                context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
-                                              text=f'***\n{context.user_data["user"]}, Ваш сообщение УДАЛЕНО!!!\n\n***')
-
             if context.user_data['status'] == 'SECOND':
                 try:
                     create_questions(update.message.text)
@@ -133,6 +122,18 @@ class Command(BaseCommand):
                 except Exception:
                     context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
                                                   text=f'***\nВаш вопрос не отправлен, отсутствуют активные доклады!\n\n***')
+            else:
+                try:
+                    context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
+                                                  text=f'***\n{context.user_data["user"]}, Ваш сообщение УДАЛЕНО!\n'
+                                                       f'Если Вы хотите задать вопрос перейдите в разде:\n'
+                                                       f'"Задать вопрос по текущему докладу"\n\n***')
+
+                except BadRequest:
+                    context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
+                                                  text=f'***\n{context.user_data["user"]}, Ваш сообщение УДАЛЕНО!\n'
+                                                       f'Если Вы хотите задать вопрос перейдите в разде:\n'
+                                                       f'"Задать вопрос по текущему докладу"\n\n****')
 
         def create_questions(question):
             lectures = Lecture.objects.filter(
