@@ -27,7 +27,7 @@ class Command(BaseCommand):
         updater = Updater(token=tg_token, use_context=True)
         dispatcher = updater.dispatcher
 
-        def start_conversation(update, context):
+        def start_speaker_conversation(update, context):
             query = update.callback_query
             previous_text = ''
             if update.message:
@@ -169,19 +169,19 @@ class Command(BaseCommand):
             return 'SPEAKER'
 
         conv_handler = ConversationHandler(
-           entry_points=[CommandHandler('start', start_conversation)],
+           entry_points=[CommandHandler('start', start_speaker_conversation)],
            states={
                'SPEAKER': [
                    CallbackQueryHandler(end_conversation, pattern='to_end_lecture'),
                    CallbackQueryHandler(show_question, pattern='to_questions|mark|1|-1'),
-                   CallbackQueryHandler(start_conversation, pattern='to_start'),
+                   CallbackQueryHandler(start_speaker_conversation, pattern='to_start'),
                ],
            },
            fallbacks=[CommandHandler('cancel', cancel)]
         )
 
         dispatcher.add_handler(conv_handler)
-        dispatcher.add_handler(CommandHandler('start', start_conversation))
+        dispatcher.add_handler(CommandHandler('start', start_speaker_conversation))
         updater.start_polling()
         updater.idle()
 
