@@ -77,6 +77,7 @@ class Command(BaseCommand):
 
         def show_question(update, context):
             query = update.callback_query
+            previous_text = query.message.text
             lecture = context.user_data['lecture']
             questions = get_questions(lecture)
             if 'question_num' not in context.user_data:
@@ -130,14 +131,14 @@ class Command(BaseCommand):
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             if quantity:
-                query.edit_message_text(
-                    text=f"Вопрос от пользователя @{question.listener.nickname}:\n {question.text}",
-                    reply_markup=reply_markup,
-                    parse_mode=ParseMode.HTML
-                )
+                message_text = f"Вопрос от пользователя @{question.listener.nickname}:\n {question.text}"
             else:
+                message_text = f"Вы ответили на все вопросы"
+
+            if message_text != previous_text:
                 query.edit_message_text(
-                    text=f"Вы ответили на все вопросы", reply_markup=reply_markup,
+                    text=message_text,
+                    reply_markup=reply_markup,
                     parse_mode=ParseMode.HTML
                 )
             return 'SPEAKER'
