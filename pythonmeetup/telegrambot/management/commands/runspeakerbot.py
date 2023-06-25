@@ -18,8 +18,6 @@ from telegram.ext import (
     ConversationHandler,
 )
 
-DEBUG = True
-
 
 class Command(BaseCommand):
     help = 'Телеграм-бот для спикеров'
@@ -133,7 +131,7 @@ class Command(BaseCommand):
 
             if quantity:
                 query.edit_message_text(
-                    text=f"Вопрос от пользователя {question.listener.nickname}:\n {question.text}",
+                    text=f"Вопрос от пользователя @{question.listener.nickname}:\n {question.text}",
                     reply_markup=reply_markup,
                     parse_mode=ParseMode.HTML
                 )

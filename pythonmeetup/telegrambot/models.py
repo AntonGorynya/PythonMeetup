@@ -12,7 +12,9 @@ class Listener(models.Model):
     is_subscriber = models.BooleanField(default=True)
 
     def __str__(self):
-        return f'{self.nickname} {self.isspeaker}'
+        if self.isspeaker:
+            return f'{self.nickname} speaker'
+        return f'{self.nickname}'
 
 
 class Event(models.Model):
@@ -35,7 +37,7 @@ class Lecture(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='lectures', verbose_name='Мероприятие')
 
     def __str__(self):
-        return f'{self.speaker} {self.speaker} {self.date} {self.start_time} - {self.end_time}'
+        return f'{self.topic} {self.speaker} {self.date} {self.start_time} - {self.end_time}'
 
     @classmethod
     def validate_time(cls, lecture):
