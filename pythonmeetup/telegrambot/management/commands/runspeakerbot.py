@@ -1,18 +1,21 @@
 from django.core.management.base import BaseCommand
 from pythonmeetup import settings
 from ...models import Listener, Question, Lecture, Event
+from telegram.error import BadRequest
 import datetime
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     ReplyKeyboardRemove,
     ParseMode,
+    Update,
     LabeledPrice
 )
 from telegram.ext import (
     Updater,
     Filters,
     MessageHandler,
+    CallbackContext,
     CommandHandler,
     CallbackQueryHandler,
     ConversationHandler,
@@ -26,6 +29,144 @@ class Command(BaseCommand):
         tg_token = settings.TG_SPEAKER_TOKEN
         updater = Updater(token=tg_token, use_context=True)
         dispatcher = updater.dispatcher
+
+        def start(update, context):
+            query = update.callback_query
+            if update.message:
+                username = update.message.from_user.username
+            else:
+                username = query.message.chat['username']
+            listener = Listener.objects.get(nickname=username)
+            context.user_data['user'] = username
+            context.user_data['status'] = "FIRST"
+
+            keyboard = [
+                [
+                    InlineKeyboardButton("Посмотреть план мероприятия", callback_data='event_plan')
+                ],
+                [
+                    InlineKeyboardButton("Задать вопрос по текущему докладу", callback_data='to_question')
+                ]
+            ]
+            if listener.isspeaker:
+                keyboard.append(
+                    [
+                        InlineKeyboardButton("Посмотреть вопросы", callback_data='to_speaker')
+                    ]
+                )
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            message_text = f"Добро пожаловать {context.user_data['user']}!\n" \
+                           f"Мы рады Вас приветствовать в сервисе PythonMeetup. \n"
+            if update.message:
+                msg = update.message.reply_text(
+                    text=message_text,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
+            else:
+                msg = edit_message_if_new(query, message_text, '', reply_markup)
+
+            context.user_data['msg'] = msg.message_id
+            return 'FIRST'
+
+        def get_schedule_events(update, context):
+            context.user_data['status'] = 'FIRST'
+            date = datetime.date.today()
+            event_schedule_list = []
+            lecture_data = Lecture.objects.all()
+            for i, item in enumerate(lecture_data, 1):
+                if item.date == date:
+                    if len(event_schedule_list) == 0:
+                        event_schedule_list.append(f'\nМероприятие: {item.event} \nРассписание на {date} \n')
+                        event_schedule_list.append(
+                            f'{len(event_schedule_list)}. {item.topic}, Докладчик: {str(item.speaker).split(" ")[0]},'
+                            f' Время проведения: {item.start_time} - {item.end_time} \n')
+                    else:
+                        event_schedule_list.append(
+                            f'{len(event_schedule_list)}. {item.topic}, Докладчик: {str(item.speaker).split(" ")[0]},'
+                            f' Время проведения: {item.start_time} - {item.end_time} \n')
+                if len(lecture_data) == i:
+                    if len(event_schedule_list) == 0:
+                        event_schedule_list.append(f'***\nРассписание на {date} отсутствует!\n\n****')
+
+            event_schedule = ' '.join(map(str, event_schedule_list))
+
+            query = update.callback_query
+            query.answer()
+            keyboard = [
+                [
+                    InlineKeyboardButton("На главную", callback_data='to_start'),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(
+                text=f"Мы рады Вас приветствовать в сервисе PythonMeetup. \n {event_schedule}\n",
+                reply_markup=reply_markup
+            )
+            return 'SECOND'
+
+        def get_question(update, context):
+            context.user_data['status'] = 'SECOND'
+            query = update.callback_query
+            query.answer()
+            keyboard = [
+                [
+                    InlineKeyboardButton("На главную", callback_data='to_start'),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(
+                text=f"Мы рады Вас приветствовать в сервисе PythonMeetup.\nНапишите Ваш вопрос по текущему докладу:\n", reply_markup=reply_markup
+            )
+
+            return 'SECOND'
+
+        def echo(update: Update, context: CallbackContext) -> None:
+            question = update.message.text.strip()
+            context.bot.delete_message(chat_id=update.effective_chat.id,
+                                       message_id=update.message.message_id)
+
+            if context.user_data['status'] == 'SECOND':
+                try:
+                    create_questions(update.message.text)
+                    context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
+                                                  text=f'***\n{context.user_data["user"]}, Ваш вопрос:\n" {update.message.text} "\n ОТПРАВЛЕН!\n\n***')
+                except Exception:
+                    context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
+                                                  text=f'***\nВаш вопрос не отправлен, отсутствуют активные доклады!\n\n***')
+            else:
+                try:
+                    context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
+                                                  text=f'***\n{context.user_data["user"]}, Ваш сообщение УДАЛЕНО!\n'
+                                                       f'Если Вы хотите задать вопрос перейдите в разде:\n'
+                                                       f'"Задать вопрос по текущему докладу"\n\n***')
+
+                except BadRequest:
+                    context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
+                                                  text=f'***\n{context.user_data["user"]}, Ваш сообщение УДАЛЕНО!\n'
+                                                       f'Если Вы хотите задать вопрос перейдите в разде:\n'
+                                                       f'"Задать вопрос по текущему докладу"\n\n****')
+            start(update, context)
+
+
+        def create_questions(question):
+            lectures = Lecture.objects.filter(
+                date=datetime.date.today(),
+                isfinished=False,
+                start_time__lte=datetime.datetime.now().time(),
+            )
+            if len(lectures) == 0:
+                raise Exception
+            for lecture in lectures:
+                listener = lecture.speaker
+                text = question
+                answered = False
+                Question.objects.create(
+                    listener=listener,
+                    lecture=lecture,
+                    text=text,
+                    answered=answered
+                )
 
         def start_speaker_conversation(update, context):
             query = update.callback_query
@@ -48,7 +189,7 @@ class Command(BaseCommand):
                                f' {decline_question(questions.count())}'
                 keyboard = [
                     [
-                        InlineKeyboardButton("Перейти к вопросам", callback_data='to_questions'),
+                        InlineKeyboardButton("Перейти к вопросам", callback_data='to_show_questions'),
                     ],
                     [
                         InlineKeyboardButton("Завершить лекцию", callback_data='to_end_lecture'),
@@ -61,15 +202,17 @@ class Command(BaseCommand):
             context.user_data['lecture'] = lecture
 
             reply_markup = InlineKeyboardMarkup(keyboard)
-            if message_text != previous_text:
-                if update.message:
-                    update.message.reply_text(
-                        text=message_text,
-                        reply_markup=reply_markup,
-                        parse_mode=ParseMode.HTML
-                    )
-                else:
-                    edit_message_if_new(query, message_text, previous_text, reply_markup)
+            edit_message_if_new(query, message_text, previous_text, reply_markup)
+
+            # if message_text != previous_text:
+            #     if update.message:
+            #         update.message.reply_text(
+            #             text=message_text,
+            #             reply_markup=reply_markup,
+            #             parse_mode=ParseMode.HTML
+            #         )
+            #     else:
+            #         edit_message_if_new(query, message_text, previous_text, reply_markup)
 
             return 'SPEAKER'
 
@@ -163,19 +306,29 @@ class Command(BaseCommand):
             return 'SPEAKER'
 
         conv_handler = ConversationHandler(
-           entry_points=[CommandHandler('start', start_speaker_conversation)],
+           entry_points=[CommandHandler('start', start)],
            states={
                'SPEAKER': [
                    CallbackQueryHandler(end_conversation, pattern='to_end_lecture'),
-                   CallbackQueryHandler(show_question, pattern='to_questions|mark|1|-1'),
+                   CallbackQueryHandler(show_question, pattern='to_show_questions|mark|1|-1'),
                    CallbackQueryHandler(start_speaker_conversation, pattern='to_start'),
+               ],
+               'FIRST': [
+                   CallbackQueryHandler(get_schedule_events, pattern='event_plan'),
+                   CallbackQueryHandler(get_question, pattern='to_question'),
+                   CallbackQueryHandler(start_speaker_conversation, pattern='to_speaker')
+               ],
+               'SECOND': [
+                   CallbackQueryHandler(start, pattern='to_start')
                ],
            },
            fallbacks=[CommandHandler('cancel', cancel)]
         )
+        echo_handler = MessageHandler(Filters.text & (~Filters.command), echo)
+        dispatcher.add_handler(echo_handler)
 
         dispatcher.add_handler(conv_handler)
-        dispatcher.add_handler(CommandHandler('start', start_speaker_conversation))
+        dispatcher.add_handler(CommandHandler('start', start))
         updater.start_polling()
         updater.idle()
 
@@ -209,8 +362,9 @@ def decline_question(n):
 
 def edit_message_if_new(query, message_text, previous_text, reply_markup):
     if message_text != previous_text:
-        query.edit_message_text(
+        msg = query.edit_message_text(
             text=message_text,
             reply_markup=reply_markup,
             parse_mode=ParseMode.HTML
         )
+        return msg
