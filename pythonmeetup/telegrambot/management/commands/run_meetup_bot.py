@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 from telegram.error import BadRequest
 
 from pythonmeetup import settings
-from ...models import Question, Lecture
+from ...models import Question, Lecture, Listener
 import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -112,6 +112,7 @@ class Command(BaseCommand):
             return 'SECOND'
 
         def echo(update: Update, context: CallbackContext) -> None:
+            telegram_user_id = update.message.from_user.id
             context.bot.delete_message(chat_id=update.effective_chat.id,
                                        message_id=update.message.message_id)
 
@@ -133,6 +134,8 @@ class Command(BaseCommand):
                 except Exception:
                     context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
                                                   text=f'***\nВаш вопрос не отправлен, отсутствуют активные доклады!\n\n***')
+
+
 
         def create_questions(question):
             lectures = Lecture.objects.filter(
@@ -173,3 +176,5 @@ class Command(BaseCommand):
 
         updater.start_polling()
         updater.idle()
+
+
