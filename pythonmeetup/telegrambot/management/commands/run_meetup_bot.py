@@ -67,18 +67,25 @@ class Command(BaseCommand):
         def get_schedule_events(update, context):
             context.user_data['status'] = 'FIRST'
             date = datetime.date.today()
-            event_schedule = ''
+            event_schedule_list = []
             lecture_data = Lecture.objects.all()
             for i, item in enumerate(lecture_data, 1):
                 if item.date == date:
-                    if i == 1:
-                        str_str = f'\nМероприятие: {item.event} \n Рассписание на {date} \n'
-                        event_schedule = event_schedule + str_str
-                    str_str = f'{i}. {item.topic}, Докладчик: {str(item.speaker).split(" ")[0]}, Время проведения: {item.start_time} - {item.end_time} \n'
-                    event_schedule = event_schedule + str_str
-                else:
-                    context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
-                                                  text=f'***\nРассписание на {date} отсутствует!\n\n****')
+                    if len(event_schedule_list) == 0:
+                        event_schedule_list.append(f'\nМероприятие: {item.event} \nРассписание на {date} \n')
+                        event_schedule_list.append(
+                            f'{len(event_schedule_list)}. {item.topic}, Докладчик: {str(item.speaker).split(" ")[0]},'
+                            f' Время проведения: {item.start_time} - {item.end_time} \n')
+                    else:
+                        event_schedule_list.append(
+                            f'{len(event_schedule_list)}. {item.topic}, Докладчик: {str(item.speaker).split(" ")[0]},'
+                            f' Время проведения: {item.start_time} - {item.end_time} \n')
+                if len(lecture_data) == i:
+                    if len(event_schedule_list) == 0:
+                        event_schedule_list.append(f'***\nРассписание на {date} отсутствует!\n\n****')
+
+            event_schedule = ' '.join(map(str, event_schedule_list))
+
             query = update.callback_query
             query.answer()
             keyboard = [
@@ -89,8 +96,13 @@ class Command(BaseCommand):
             reply_markup = InlineKeyboardMarkup(keyboard)
             query.edit_message_text(text="Мы рады Вас приветствовать в сервисе PythonMeetup.",
                                     reply_markup=reply_markup)
-            context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
-                                          text=f'***\n{event_schedule}\n\n****')
+
+            try:
+                context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
+                                              text=f'***\n{event_schedule}\n\n***')
+            except BadRequest:
+                context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
+                                              text=f'***\n{event_schedule}\n\n****')
 
             return 'SECOND'
 
@@ -107,33 +119,39 @@ class Command(BaseCommand):
             query.edit_message_text(
                 text="Мы рады Вас приветствовать в сервисе PythonMeetup.", reply_markup=reply_markup
             )
-            context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
-                                          text=f'***\nНапишите Ваш вопрос по текущему докладу:\n\n****')
+            try:
+                context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
+                                              text=f'***\nНапишите Ваш вопрос по текущему докладу:\n\n***')
+            except:
+                context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
+                                              text=f'***\nНапишите Ваш вопрос по текущему докладу:\n\n****')
+
             return 'SECOND'
 
         def echo(update: Update, context: CallbackContext) -> None:
             telegram_user_id = update.message.from_user.id
             context.bot.delete_message(chat_id=update.effective_chat.id,
                                        message_id=update.message.message_id)
-
-            try:
-                context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
-                                              text=f'***\n{context.user_data["user"]}, Ваш сообщение УДАЛЕНО!\n'
-                                                   f'Если Вы хотите задать вопрос перейдите в разде:\n'
-                                                   f'"Задать вопрос по текущему докладу"\n\n****')
-
-            except BadRequest:
-                context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
-                                              text=f'***\n{context.user_data["user"]}, Ваш сообщение УДАЛЕНО!!!\n\n***')
-
             if context.user_data['status'] == 'SECOND':
                 try:
                     create_questions(update.message.text)
                     context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
-                                                  text=f'***\n{context.user_data["user"]}, \n Ваш вопрос:\n" {update.message.text} "\n ОТПРАВЛЕН!\n\n***')
+                                                  text=f'***\n{context.user_data["user"]}, Ваш вопрос:\n" {update.message.text} "\n ОТПРАВЛЕН!\n\n***')
                 except Exception:
                     context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
                                                   text=f'***\nВаш вопрос не отправлен, отсутствуют активные доклады!\n\n***')
+            else:
+                try:
+                    context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
+                                                  text=f'***\n{context.user_data["user"]}, Ваш сообщение УДАЛЕНО!\n'
+                                                       f'Если Вы хотите задать вопрос перейдите в разде:\n'
+                                                       f'"Задать вопрос по текущему докладу"\n\n***')
+
+                except BadRequest:
+                    context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
+                                                  text=f'***\n{context.user_data["user"]}, Ваш сообщение УДАЛЕНО!\n'
+                                                       f'Если Вы хотите задать вопрос перейдите в разде:\n'
+                                                       f'"Задать вопрос по текущему докладу"\n\n****')
 
 
 
