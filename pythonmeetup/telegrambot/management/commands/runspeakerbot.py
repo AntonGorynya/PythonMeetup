@@ -303,7 +303,8 @@ class Command(BaseCommand):
                 text=f"Лекция завершена", reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
             )
-            return 'SPEAKER'
+            return 'SECOND'
+            #return 'SPEAKER'
 
         conv_handler = ConversationHandler(
            entry_points=[CommandHandler('start', start)],
