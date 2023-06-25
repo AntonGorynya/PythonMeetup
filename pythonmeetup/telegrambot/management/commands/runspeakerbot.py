@@ -69,10 +69,8 @@ class Command(BaseCommand):
                         parse_mode=ParseMode.HTML
                     )
                 else:
-                    query.edit_message_text(
-                        text=message_text, reply_markup=reply_markup,
-                        parse_mode=ParseMode.HTML
-                    )
+                    edit_message_if_new(query, message_text, previous_text, reply_markup)
+
             return 'SPEAKER'
 
         def show_question(update, context):
@@ -135,12 +133,7 @@ class Command(BaseCommand):
             else:
                 message_text = f"Вы ответили на все вопросы"
 
-            if message_text != previous_text:
-                query.edit_message_text(
-                    text=message_text,
-                    reply_markup=reply_markup,
-                    parse_mode=ParseMode.HTML
-                )
+            edit_message_if_new(query, message_text, previous_text, reply_markup)
             return 'SPEAKER'
 
         def cancel(update, _):
@@ -212,3 +205,12 @@ def decline_question(n):
         return 'не отвеченных вопроса'
     else:
         return 'не отвеченных вопросов'
+
+
+def edit_message_if_new(query, message_text, previous_text, reply_markup):
+    if message_text != previous_text:
+        query.edit_message_text(
+            text=message_text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML
+        )
