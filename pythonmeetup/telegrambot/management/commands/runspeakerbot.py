@@ -37,7 +37,9 @@ class Command(BaseCommand):
             else:
                 username = query.message.chat['username']
             print(username)
-            listener = Listener.objects.get_or_create(nickname=username)
+            listener, created = Listener.objects.get_or_create(
+                nickname=username
+            )
             context.user_data['user'] = username
             context.user_data['listener'] = listener
             context.user_data['status'] = "FIRST"
