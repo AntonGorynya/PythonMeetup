@@ -116,7 +116,7 @@ class Command(BaseCommand):
             context.user_data['lecture'] = lecture
             text = 'Отсутствуют активные доклады!'
             if lecture:
-                text ='Напишите Ваш вопрос по текущему докладу:'
+                text = 'Напишите Ваш вопрос по текущему докладу:'
             query.answer()
             keyboard = [
                 [
@@ -133,7 +133,6 @@ class Command(BaseCommand):
             return 'GET_QUESTION'
 
         def get_question(update: Update, context: CallbackContext) -> None:
-            query = update.callback_query
             question = update.message.text.strip()
             if context.user_data['lecture']:
                 Question.objects.create(
@@ -144,7 +143,6 @@ class Command(BaseCommand):
                 )
             start(update, context)
             return 'FIRST'
-
 
         def start_speaker_conversation(update, context):
             query = update.callback_query
@@ -181,17 +179,6 @@ class Command(BaseCommand):
 
             reply_markup = InlineKeyboardMarkup(keyboard)
             edit_message_if_new(query, message_text, previous_text, reply_markup)
-
-            # if message_text != previous_text:
-            #     if update.message:
-            #         update.message.reply_text(
-            #             text=message_text,
-            #             reply_markup=reply_markup,
-            #             parse_mode=ParseMode.HTML
-            #         )
-            #     else:
-            #         edit_message_if_new(query, message_text, previous_text, reply_markup)
-
             return 'SPEAKER'
 
         def show_question(update, context):
@@ -221,10 +208,10 @@ class Command(BaseCommand):
                     question = questions[context.user_data['question_num']]
                 else:
                     context.user_data['question_num'] = 0
-
-            print(query['data'])
-            print(question_num + 1, '/', quantity)
-            print(question)
+            if settings.DEBUG:
+                print(query['data'])
+                print(question_num + 1, '/', quantity)
+                print(question)
 
             if quantity:
                 question = questions[question_num]
@@ -311,9 +298,6 @@ class Command(BaseCommand):
            },
            fallbacks=[CommandHandler('cancel', cancel)]
         )
-        #echo_handler = MessageHandler(Filters.text & (~Filters.command), get_question)
-        #dispatcher.add_handler(echo_handler)
-
         dispatcher.add_handler(conv_handler)
         dispatcher.add_handler(CommandHandler('start', start))
         updater.start_polling()
