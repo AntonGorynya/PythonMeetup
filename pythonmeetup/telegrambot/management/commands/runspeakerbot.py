@@ -34,11 +34,14 @@ class Command(BaseCommand):
             query = update.callback_query
             if update.message:
                 username = update.message.from_user.username
+                chat_id = update.message.chat.id
             else:
                 username = query.message.chat['username']
-            print(username)
+                chat_id = query.message.chat['id']
+
             listener, created = Listener.objects.get_or_create(
-                nickname=username
+                nickname=username,
+                chat_id=chat_id,
             )
             context.user_data['user'] = username
             context.user_data['listener'] = listener
