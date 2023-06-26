@@ -2,6 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.forms import JSONField
 from telegram import Bot
+from  telegram.error import BadRequest
 
 from pythonmeetup import settings
 
@@ -69,7 +70,7 @@ class Lecture(models.Model):
             message = f'Расписание изменилось. Доклад {self.topic} состоится в {self.start_time}'
             try:
                 bot.send_message(chat_id=chat_id, text=message)
-            except Exception as e:
+            except BadRequest as e:
                 print(e)
 
 
