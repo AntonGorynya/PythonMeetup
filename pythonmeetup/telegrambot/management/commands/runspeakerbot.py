@@ -38,6 +38,7 @@ class Command(BaseCommand):
                 username = query.message.chat['username']
             listener = Listener.objects.get(nickname=username)
             context.user_data['user'] = username
+            context.user_data['listener'] = listener
             context.user_data['status'] = "FIRST"
 
             keyboard = [
@@ -105,9 +106,17 @@ class Command(BaseCommand):
             )
             return 'SECOND'
 
-        def get_question(update, context):
-            context.user_data['status'] = 'SECOND'
+        def leave_question(update, context):
             query = update.callback_query
+            lecture = Lecture.objects.filter(
+                date=datetime.date.today(),
+                isfinished=False,
+                start_time__lte=datetime.datetime.now().time(),
+            ).first()
+            context.user_data['lecture'] = lecture
+            text = 'Отсутствуют активные доклады!'
+            if lecture:
+                text ='Напишите Ваш вопрос по текущему докладу:'
             query.answer()
             keyboard = [
                 [
@@ -115,58 +124,27 @@ class Command(BaseCommand):
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
+
             query.edit_message_text(
-                text=f"Мы рады Вас приветствовать в сервисе PythonMeetup.\nНапишите Ваш вопрос по текущему докладу:\n", reply_markup=reply_markup
+                text=text,
+                reply_markup=reply_markup
             )
 
-            return 'SECOND'
+            return 'GET_QUESTION'
 
-        def echo(update: Update, context: CallbackContext) -> None:
+        def get_question(update: Update, context: CallbackContext) -> None:
+            query = update.callback_query
             question = update.message.text.strip()
-            context.bot.delete_message(chat_id=update.effective_chat.id,
-                                       message_id=update.message.message_id)
-
-            if context.user_data['status'] == 'SECOND':
-                try:
-                    create_questions(update.message.text)
-                    context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
-                                                  text=f'***\n{context.user_data["user"]}, Ваш вопрос:\n" {update.message.text} "\n ОТПРАВЛЕН!\n\n***')
-                except Exception:
-                    context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
-                                                  text=f'***\nВаш вопрос не отправлен, отсутствуют активные доклады!\n\n***')
-            else:
-                try:
-                    context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
-                                                  text=f'***\n{context.user_data["user"]}, Ваш сообщение УДАЛЕНО!\n'
-                                                       f'Если Вы хотите задать вопрос перейдите в разде:\n'
-                                                       f'"Задать вопрос по текущему докладу"\n\n***')
-
-                except BadRequest:
-                    context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=context.user_data['msg'],
-                                                  text=f'***\n{context.user_data["user"]}, Ваш сообщение УДАЛЕНО!\n'
-                                                       f'Если Вы хотите задать вопрос перейдите в разде:\n'
-                                                       f'"Задать вопрос по текущему докладу"\n\n****')
-            start(update, context)
-
-
-        def create_questions(question):
-            lectures = Lecture.objects.filter(
-                date=datetime.date.today(),
-                isfinished=False,
-                start_time__lte=datetime.datetime.now().time(),
-            )
-            if len(lectures) == 0:
-                raise Exception
-            for lecture in lectures:
-                listener = lecture.speaker
-                text = question
-                answered = False
+            if context.user_data['lecture']:
                 Question.objects.create(
-                    listener=listener,
-                    lecture=lecture,
-                    text=text,
-                    answered=answered
+                    listener=context.user_data['listener'],
+                    lecture=context.user_data['lecture'],
+                    text=question,
+                    answered=False
                 )
+            start(update, context)
+            return 'FIRST'
+
 
         def start_speaker_conversation(update, context):
             query = update.callback_query
@@ -224,6 +202,7 @@ class Command(BaseCommand):
             if 'question_num' not in context.user_data:
                 context.user_data['question_num'] = 0
             question_num = context.user_data['question_num']
+            question = questions[question_num]
             quantity = questions.count()
 
             # Получаем порядковый номер следующего вопроса
@@ -242,6 +221,10 @@ class Command(BaseCommand):
                     question = questions[context.user_data['question_num']]
                 else:
                     context.user_data['question_num'] = 0
+
+            print(query['data'])
+            print(question_num + 1, '/', quantity)
+            print(question)
 
             if quantity:
                 question = questions[question_num]
@@ -316,17 +299,20 @@ class Command(BaseCommand):
                ],
                'FIRST': [
                    CallbackQueryHandler(get_schedule_events, pattern='event_plan'),
-                   CallbackQueryHandler(get_question, pattern='to_question'),
+                   CallbackQueryHandler(leave_question, pattern='to_question'),
                    CallbackQueryHandler(start_speaker_conversation, pattern='to_speaker')
                ],
                'SECOND': [
                    CallbackQueryHandler(start, pattern='to_start')
                ],
+               'GET_QUESTION': [
+                   MessageHandler(Filters.text, get_question),
+               ],
            },
            fallbacks=[CommandHandler('cancel', cancel)]
         )
-        echo_handler = MessageHandler(Filters.text & (~Filters.command), echo)
-        dispatcher.add_handler(echo_handler)
+        #echo_handler = MessageHandler(Filters.text & (~Filters.command), get_question)
+        #dispatcher.add_handler(echo_handler)
 
         dispatcher.add_handler(conv_handler)
         dispatcher.add_handler(CommandHandler('start', start))
