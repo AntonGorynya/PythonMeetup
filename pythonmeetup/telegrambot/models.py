@@ -1,10 +1,16 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.forms import JSONField
+from telegram import Bot
+
+from pythonmeetup import settings
 
 
 class Listener(models.Model):
     nickname = models.CharField(max_length=500, verbose_name='Никнейм клиента', unique=True)
     isspeaker = models.BooleanField(default=False, verbose_name='Является спикером?')
+    is_subscriber = models.BooleanField(default=True)
+    chat_id = models.CharField(max_length=50, verbose_name='Chat ID')
 
     def __str__(self):
         if self.isspeaker:
@@ -47,6 +53,22 @@ class Lecture(models.Model):
 
     def clean(self):
         self.validate_time(self)
+
+    def save(self, *args, **kwargs):
+        is_new = self._state.adding
+        super().save(*args, **kwargs)
+
+        if not is_new:
+            self.send_notification()
+
+    def send_notification(self):
+        subscribers = Listener.objects.filter(is_subscriber=True)
+        bot = Bot(token=settings.TG_LISTENER_TOKEN)
+        for subscriber in subscribers:
+            chat_id = subscriber.chat_id
+
+            message = f'Расписание изменилось. Доклад {self.topic} состоится в {self.start_time}'
+            bot.send_message(chat_id=chat_id, text=message)
 
 
 class Question(models.Model):

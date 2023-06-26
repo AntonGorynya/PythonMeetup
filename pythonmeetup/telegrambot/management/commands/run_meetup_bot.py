@@ -2,9 +2,9 @@ from django.core.management.base import BaseCommand
 from telegram.error import BadRequest
 
 from pythonmeetup import settings
-from ...models import Question, Lecture
+from ...models import Question, Lecture, Listener
 import datetime
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Bot
 from telegram.ext import (
     Updater,
     CommandHandler,
@@ -27,10 +27,17 @@ class Command(BaseCommand):
         def start(update, context):
             user = update.message.from_user
             context.user_data['user'] = user.first_name
-            msg = context.bot.send_message(chat_id=update.effective_chat.id,
+            chat_id = update.effective_chat.id
+
+            listener, _ = Listener.objects.get_or_create(nickname=user.first_name)
+            listener.chat_id = chat_id
+            listener.save()
+
+            msg = context.bot.send_message(chat_id=chat_id,
                                            text=f'***\nДобро пожаловать {context.user_data["user"]}!\n\n***')
             context.user_data['msg'] = msg.message_id
             context.user_data['status'] = "FIRST"
+
 
             keyboard = [
                 [
