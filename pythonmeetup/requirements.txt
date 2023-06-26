@@ -2,3 +2,4 @@ Django==4.2.2
 environs==9.3.0
 python-telegram-bot==13.15
 Faker==18.11.1
+whitenoise==6.5.0

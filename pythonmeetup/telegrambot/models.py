@@ -1,6 +1,6 @@
-from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.forms import JSONField
 from telegram import Bot
 
 from pythonmeetup import settings
@@ -10,6 +10,7 @@ class Listener(models.Model):
     nickname = models.CharField(max_length=500, verbose_name='Никнейм клиента', unique=True)
     isspeaker = models.BooleanField(default=False, verbose_name='Является спикером?')
     is_subscriber = models.BooleanField(default=True)
+    chat_id = models.CharField(max_length=50, verbose_name='Chat ID')
 
     def __str__(self):
         if self.isspeaker:
