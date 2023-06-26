@@ -36,6 +36,7 @@ class Command(BaseCommand):
                 username = update.message.from_user.username
             else:
                 username = query.message.chat['username']
+            print(username)
             listener = Listener.objects.get(nickname=username)
             context.user_data['user'] = username
             context.user_data['listener'] = listener
@@ -158,6 +159,9 @@ class Command(BaseCommand):
             keyboard = [
                 [
                     InlineKeyboardButton("Обновить", callback_data='to_start'),
+                ],
+                [
+                    InlineKeyboardButton("На главный экран", callback_data='to_main'),
                 ],
             ]
             if lecture:
@@ -283,6 +287,7 @@ class Command(BaseCommand):
                    CallbackQueryHandler(end_conversation, pattern='to_end_lecture'),
                    CallbackQueryHandler(show_question, pattern='to_show_questions|mark|1|-1'),
                    CallbackQueryHandler(start_speaker_conversation, pattern='to_start'),
+                   CallbackQueryHandler(start, pattern='to_main'),
                ],
                'FIRST': [
                    CallbackQueryHandler(get_schedule_events, pattern='event_plan'),
@@ -294,6 +299,7 @@ class Command(BaseCommand):
                ],
                'GET_QUESTION': [
                    MessageHandler(Filters.text, get_question),
+                   CallbackQueryHandler(start, pattern='to_start'),
                ],
            },
            fallbacks=[CommandHandler('cancel', cancel)]
