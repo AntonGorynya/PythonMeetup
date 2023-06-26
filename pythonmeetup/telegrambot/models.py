@@ -66,9 +66,11 @@ class Lecture(models.Model):
         bot = Bot(token=settings.TG_LISTENER_TOKEN)
         for subscriber in subscribers:
             chat_id = subscriber.chat_id
-
             message = f'Расписание изменилось. Доклад {self.topic} состоится в {self.start_time}'
-            bot.send_message(chat_id=chat_id, text=message)
+            try:
+                bot.send_message(chat_id=chat_id, text=message)
+            except Exception as e:
+                print(e)
 
 
 class Question(models.Model):
